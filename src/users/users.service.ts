@@ -1,22 +1,45 @@
-import { Injectable } from '@nestjs/common';
-import { IUser } from 'src/interfaces/user.interface';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { CreateUserDto } from './create-user.dto';
+import { IUser } from '../interfaces/user.interface';
+import { Model } from 'mongoose';
 
 @Injectable()
 export class UsersService {
-  private readonly users: IUser[] = [
-    {
-      userId: 1,
-      username: 'john',
-      password: 'changeme',
-    },
-    {
-      userId: 2,
-      username: 'maria',
-      password: 'guess',
-    },
-  ];
+  constructor(@InjectModel('User') private userModel: Model<IUser>) {}
 
-  async findOne(username: string): Promise<IUser | undefined> {
-    return this.users.find((user) => user.username === username);
+  async createUser(createUserDto: CreateUserDto): Promise<IUser> {
+    const newUser = await new this.userModel(createUserDto);
+    return newUser.save();
+  }
+
+  async getAllUsers(): Promise<IUser[]> {
+    const userData = await this.userModel.find();
+
+    if (!userData || userData.length == 0) {
+      throw new NotFoundException('Users data not found!');
+    }
+
+    return userData;
+  }
+
+  async getUser(userId: string): Promise<IUser> {
+    const existingUser = await this.userModel.findById(userId).exec();
+
+    if (!existingUser) {
+      throw new NotFoundException(`User #${userId} not found`);
+    }
+
+    return existingUser;
+  }
+
+  async deleteUser(userId: string): Promise<IUser> {
+    const deletedUser = await this.userModel.findByIdAndDelete(userId);
+
+    if (!deletedUser) {
+      throw new NotFoundException(`User #${userId} not found`);
+    }
+
+    return deletedUser;
   }
 }
