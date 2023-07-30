@@ -1,45 +1,72 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { CreateUserDto } from './create-user.dto';
-import { IUser } from '../interfaces/user.interface';
-import { Model } from 'mongoose';
+import { UserModel } from './users.model';
+import { User } from './users.schema';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel('User') private userModel: Model<IUser>) {}
+  constructor(@InjectModel(User.name) private userModel: UserModel) {}
 
-  async createUser(createUserDto: CreateUserDto): Promise<IUser> {
-    const newUser = await new this.userModel(createUserDto);
-    return newUser.save();
+  private generateUsername(name: string): string {
+    return name.replace(/\s+/g, '').toLowerCase();
   }
 
-  async getAllUsers(): Promise<IUser[]> {
-    const userData = await this.userModel.find();
+  async createUser(createUserDto: CreateUserDto): Promise<User> {
+    try {
+      if (!createUserDto.username) {
+        createUserDto.username = this.generateUsername(createUserDto.username);
+      }
 
-    if (!userData || userData.length == 0) {
-      throw new NotFoundException('Users data not found!');
+      if (await this.userModel.findByUsername(createUserDto.username)) {
+        throw new BadRequestException('Username already exists');
+      }
+
+      return this.userModel.createUser(createUserDto);
+    } catch (error) {
+      throw new Error('Failed to create a new user.');
+    }
+  }
+
+  async getUserById(userId: string): Promise<User> {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const users = await this.userModel.getAllUsers();
+
+    if (!users || users.length == 0) {
+      throw new NotFoundException('Users not found!');
     }
 
-    return userData;
+    return users;
   }
 
-  async getUser(userId: string): Promise<IUser> {
-    const existingUser = await this.userModel.findById(userId).exec();
+  // async getUser(userId: string): Promise<IUser> {
+  //   const existingUser = await this.userModel.findById(userId).exec();
 
-    if (!existingUser) {
-      throw new NotFoundException(`User #${userId} not found`);
-    }
+  //   if (!existingUser) {
+  //     throw new NotFoundException(`User #${userId} not found`);
+  //   }
 
-    return existingUser;
-  }
+  //   return existingUser;
+  // }
 
-  async deleteUser(userId: string): Promise<IUser> {
-    const deletedUser = await this.userModel.findByIdAndDelete(userId);
+  // async deleteUser(userId: string): Promise<IUser> {
+  //   const deletedUser = await this.userModel.findByIdAndDelete(userId);
 
-    if (!deletedUser) {
-      throw new NotFoundException(`User #${userId} not found`);
-    }
+  //   if (!deletedUser) {
+  //     throw new NotFoundException(`User #${userId} not found`);
+  //   }
 
-    return deletedUser;
-  }
+  //   return deletedUser;
+  // }
 }
